@@ -781,6 +781,63 @@ TrustFrameworkPolicy:
             </TechnicalProfiles>
         </ClaimsProvider>
 
+        <!-- 
+            "Azure AD Technical Profiles" ClaimsProvider: 
+                Azure AD にユーザーの作成と読込をするためのクレームプロバイダー
+         -->
+        <ClaimsProvider>
+            <DisplayName>Azure AD Technical Profiles</DisplayName>
+            <TechnicalProfiles>
+                <!-- AAD-USerWrite: Azure AD にユーザーを作成するためのテクニカルプロファイル -->
+                <TechnicalProfile Id="AAD-UserWrite">
+                    <DisplayName>Write user information to AAD</DisplayName>
+                    <Protocol Name="Proprietary" Handler="Web.TPEngine.Providers.AzureActiveDirectoryProvider, Web.TPEngine, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null" />
+                    <Metadata>
+                        <Item Key="Operation">Write</Item>
+                        <Item Key="RaiseErrorIfClaimsPrincipalAlreadyExists">true</Item>
+                        <Item Key="UserMessageIfClaimsPrincipalAlreadyExists">The account already exists. Try to create another account</Item>
+                    </Metadata>
+                    <InputClaims>
+                        <InputClaim ClaimTypeReferenceId="email" PartnerClaimType="signInNames.emailAddress" Required="true" />
+                    </InputClaims>
+                    <PersistedClaims>
+                        <PersistedClaim ClaimTypeReferenceId="email" PartnerClaimType="signInNames.emailAddress" />        
+                        <PersistedClaim ClaimTypeReferenceId="displayName" />
+                        <PersistedClaim ClaimTypeReferenceId="givenName" />
+                        <PersistedClaim ClaimTypeReferenceId="surname" />
+                        <PersistedClaim ClaimTypeReferenceId="password"/>
+                        <PersistedClaim ClaimTypeReferenceId="passwordPolicies" DefaultValue="DisablePasswordExpiration,DisableStrongPassword" />
+                    </PersistedClaims>
+                    <OutputClaims>
+                        <OutputClaim ClaimTypeReferenceId="objectId" />
+                        <OutputClaim ClaimTypeReferenceId="userPrincipalName" />
+                        <OutputClaim ClaimTypeReferenceId="email" PartnerClaimType="signInNames.emailAddress" />
+                    </OutputClaims>
+                </TechnicalProfile>
+
+                <!-- AAD-UserRead: Azure AD からユーザーを読み込むためのテクニカルプロファイル -->
+                <TechnicalProfile Id="AAD-UserRead">
+                    <DisplayName>Read user from Azure AD storage</DisplayName>
+                    <Protocol Name="Proprietary" Handler="Web.TPEngine.Providers.AzureActiveDirectoryProvider, Web.TPEngine, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null" />
+                    <Metadata>
+                        <Item Key="Operation">Read</Item>
+                        <Item Key="RaiseErrorIfClaimsPrincipalAlreadyExists">false</Item>
+                        <Item Key="RaiseErrorIfClaimsPrincipalDoesNotExist">false</Item>
+                    </Metadata>
+                    <InputClaims>
+                        <InputClaim ClaimTypeReferenceId="email" PartnerClaimType="signInNames.emailAddress" Required="true" />
+                    </InputClaims>
+                    <OutputClaims>
+                        <OutputClaim ClaimTypeReferenceId="objectId" />
+                        <OutputClaim ClaimTypeReferenceId="userPrincipalName" />
+                        <OutputClaim ClaimTypeReferenceId="givenName"/>
+                        <OutputClaim ClaimTypeReferenceId="surname"/>
+                        <OutputClaim ClaimTypeReferenceId="displayName"/>
+                    </OutputClaims>
+                </TechnicalProfile>
+            </TechnicalProfiles>
+        </ClaimsProvider>
+
         <ClaimsProvider>
             <DisplayName>Token Issuer</DisplayName>
             <!-- TechnicalProfiles: クレームプロバイダーがサポートする技術的な動作や設定をまとめたセクション -->
