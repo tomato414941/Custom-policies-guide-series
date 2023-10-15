@@ -1,0 +1,925 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!-- カスタムポリシー ContosoCustomPolicy の定義 -->
+
+<!-- 
+TrustFrameworkPolicy:
+    Azure AD B2C では、この XML ベースのカスタムポリシーを使用してユーザージャーニーを定義し、認証と認可の動作を高度にカスタマイズできる
+-->
+
+<!-- TenantId: Azure AD B2C のテナントを一意に識別するためのもの -->
+<!-- PolicyId: このカスタムポリシーの ID -->
+<!-- 
+    publicPolicyUri: 
+    カスタムポリシーの公的な識別子を示す URI
+    外部アプリケーションやサービスがこのカスタムポリシーを参照する際や OpenID Connect、OAuth2 の認証リクエスト時に使われる
+    フォーマットは通常 "http://{your-tenant-name}.onmicrosoft.com/{policy-name}"
+-->
+
+<!-- TenantId と PublicPolicyUri の yourtenant を置き換える必要がある -->
+
+<TrustFrameworkPolicy
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+  xmlns="http://schemas.microsoft.com/online/cpim/schemas/2013/06"
+  PolicySchemaVersion="0.3.0.0"
+  TenantId="yourtenant.onmicrosoft.com" 
+  PolicyId="B2C_1A_ContosoCustomPolicy" 
+  PublicPolicyUri="http://yourtenant.onmicrosoft.com/B2C_1A_ContosoCustomPolicy">
+
+
+    <!-- 
+    TrustFrameworkPolicy には以下の主要なコンポーネントが含まれる:
+        1. BuildingBlocks: 再利用可能なコンポーネントや設定の定義
+        2. ClaimsProviders: クレームデータを提供するソースやサービスの定義
+        3. UserJourneys: ユーザーが実行する手順やフローを定義
+        4. RelyingParty: このカスタムポリシーを使用するアプリケーションやサービスの設定
+    -->
+
+    <!-- BuildingBlocks: 再利用可能なコンポーネントや設定を定義するセクション -->
+    <BuildingBlocks>
+
+        <!-- ClaimsSchema: クレームの型を定義するセクション -->
+        <!-- 
+            クレーム:
+            ユーザーやシステムに関する情報の断片で、通常は名前と値のペアで構成される変数のようなもの
+            クレームは認証や認可のプロセスで使われ、ユーザーの身元や属性、権限などを表現するのに使用する
+        -->
+        <ClaimsSchema>
+            <!-- ClaimType: クレームの型を定義し、それぞれのクレームのデータ型や表示名などの属性を指定する -->
+                <!--DisplayName: クレームの表示名。ユーザーには表示されないが、開発者が理解するためのもの -->
+                <!-- DataType: クレームのデータ型 -->
+                <!--
+                DefaultPartnerClaimTypes: このクレームを使用するプロトコルとそのクレームの型を定義する
+                    以下の値が指定可能:
+                        1. OpenIdConnect: OpenID Connect プロトコル
+                        2. SAML2: SAML プロトコル
+                        3. OAuth2: OAuth2 プロトコル
+                -->
+                <!-- UserHelpText: ユーザーがこのクレームの値を入力する際に表示されるヘルプテキスト -->
+                <!-- 
+                UserInputType: 
+                    ユーザーがこのクレームの値を入力する際に使用する UI コンポーネントのタイプ
+                    以下の値が指定可能:
+                        1. TextBox: テキストボックス
+                        2. RadioSingleSelect: ラジオボタン
+                 -->
+            
+            <!-- accountType クレーム: アカウントの種類を保持する -->
+            <ClaimType Id="accountType">
+                <DisplayName>Account Type</DisplayName>
+                <DataType>string</DataType>
+                <UserHelpText>The type of account used by the user</UserHelpText>
+                <UserInputType>RadioSingleSelect</UserInputType>
+                <Restriction>
+                    <Enumeration Text="Contoso Employee Account" Value="work" SelectByDefault="true"/>
+                    <Enumeration Text="Personal Account" Value="personal" SelectByDefault="false"/>
+                </Restriction>
+            </ClaimType>
+            
+            <!-- accessCode: 招待コードを保持するクレーム -->
+            <ClaimType Id="accessCode">
+                <DisplayName>Access Code</DisplayName>
+                <DataType>string</DataType>
+                <UserHelpText>Enter your invitation access code.</UserHelpText>
+                <UserInputType>Password</UserInputType>
+                <Restriction>
+                    <Pattern 
+                      RegularExpression="[0-9][0-9][0-9][0-9][0-9]" 
+                      HelpText="Please enter your invitation access code. It's a 5-digit number, something like 95765"/>
+                </Restriction>
+            </ClaimType>
+
+            <!-- isValidAccessCode: 招待コードが有効かどうかを保持するクレーム -->
+            <ClaimType Id="isValidAccessCode">
+                <DataType>boolean</DataType>
+            </ClaimType>
+
+            <!-- objectId クレーム: 返されるクレームの主題 (subject) に対する一意のオブジェクトID を保持する -->
+            <ClaimType Id="objectId">
+                <DisplayName>unique object Id for subject of the claims being returned</DisplayName>
+                <DataType>string</DataType>
+            </ClaimType>
+
+            <!-- givenName クレーム: ユーザーの名前 (通常、名前またはファーストネームとして知られる) を保持する -->
+            <ClaimType Id="givenName">
+                <DisplayName>Given Name</DisplayName>
+                <DataType>string</DataType>
+                <UserHelpText>Your given name (also known as first name).</UserHelpText>
+                <UserInputType>TextBox</UserInputType>
+            </ClaimType>
+
+            <!-- surname クレーム: ユーザーの姓 (通常、ファミリーネームまたはラストネームとして知られる) を保持する -->
+            <ClaimType Id="surname">
+                <DisplayName>Surname</DisplayName>
+                <DataType>string</DataType>
+                <UserHelpText>Your surname (also known as family name or last name).</UserHelpText>
+                <UserInputType>TextBox</UserInputType>
+            </ClaimType>
+
+            <!-- email クレーム: ユーザーのメールアドレスを保持する -->
+            <ClaimType Id="email">
+                <DisplayName>Email Address</DisplayName>
+                <DataType>string</DataType>
+                <DefaultPartnerClaimTypes>
+                    <Protocol Name="OpenIdConnect" PartnerClaimType="email"/>
+                </DefaultPartnerClaimTypes>
+                <UserHelpText>Your email address. </UserHelpText>
+                <UserInputType>TextBox</UserInputType>
+                <Restriction>
+                    <Pattern RegularExpression="^[a-zA-Z0-9.!#$%&amp;&apos;^_`{}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$" HelpText="Please enter a valid email address something like maurice@contoso.com"/>
+                </Restriction>
+            </ClaimType>
+
+            <!-- password クレーム: ユーザーのパスワードを保持する -->
+            <ClaimType Id="password">
+                <DisplayName>Password</DisplayName>
+                <DataType>string</DataType>
+                <AdminHelpText>Enter password</AdminHelpText>
+                <UserHelpText>Enter password</UserHelpText>
+                <UserInputType>Password</UserInputType>
+                <PredicateValidationReference Id="StrongPassword" />
+            </ClaimType>
+
+            <!-- reenterPassword クレーム: ユーザーのパスワードを保持する -->
+            <ClaimType Id="reenterPassword">
+                <DisplayName>Confirm new password</DisplayName>
+                <DataType>string</DataType>
+                <AdminHelpText>Confirm new password</AdminHelpText>
+                <UserHelpText>Reenter password</UserHelpText>
+                <UserInputType>Password</UserInputType>
+            </ClaimType>    
+
+            <!-- displayName クレーム: ユーザーの表示名を保持する -->
+            <ClaimType Id="displayName">
+                <DisplayName>Display Name</DisplayName>
+                <DataType>string</DataType>
+                <UserHelpText>Your display name.</UserHelpText>
+                <UserInputType>TextBox</UserInputType>
+            </ClaimType>
+
+            <!-- message クレーム: メッセージを保持する -->
+            <ClaimType Id="message">
+                <DisplayName>Will hold Hello World message</DisplayName>
+                <DataType>string</DataType>
+            </ClaimType>
+
+            <!-- domain クレーム: ユーザーのドメインを保持する -->
+            <ClaimType Id="domain">
+                <DataType>string</DataType>
+            </ClaimType>
+
+            <!-- domainStatus クレーム: ユーザーのドメインの状態を保持する -->
+            <ClaimType Id="domainStatus">
+                <DataType>string</DataType>
+            </ClaimType>
+        </ClaimsSchema>
+
+        <!-- Predicates: 条件の集合を定義し、これらの条件はクレームの検証に使用される -->
+        <!-- PredicateValidations: 特定の条件が満たされているかどうかを検証するために使用される述語検証の集合を定義する-->        
+
+        <Predicates>
+            <Predicate Id="IsLengthBetween8And64" Method="IsLengthRange" HelpText="The password must be between 8 and 64 characters.">
+                <Parameters>
+                  <Parameter Id="Minimum">8</Parameter>
+                  <Parameter Id="Maximum">64</Parameter>
+                </Parameters>
+              </Predicate>
+            
+              <Predicate Id="Lowercase" Method="IncludesCharacters" HelpText="a lowercase letter">
+                <Parameters>
+                  <Parameter Id="CharacterSet">a-z</Parameter>
+                </Parameters>
+              </Predicate>
+            
+              <Predicate Id="Uppercase" Method="IncludesCharacters" HelpText="an uppercase letter">
+                <Parameters>
+                  <Parameter Id="CharacterSet">A-Z</Parameter>
+                </Parameters>
+              </Predicate>
+            
+              <Predicate Id="Number" Method="IncludesCharacters" HelpText="a digit">
+                <Parameters>
+                  <Parameter Id="CharacterSet">0-9</Parameter>
+                </Parameters>
+              </Predicate>
+            
+              <Predicate Id="Symbol" Method="IncludesCharacters" HelpText="a symbol">
+                <Parameters>
+                  <Parameter Id="CharacterSet">@#$%^&amp;*\-_+=[]{}|\\:',.?/`~"();!</Parameter>
+                </Parameters>
+              </Predicate>
+            
+              <Predicate Id="PIN" Method="MatchesRegex" HelpText="The password must be numbers only.">
+                <Parameters>
+                  <Parameter Id="RegularExpression">^[0-9]+$</Parameter>
+                </Parameters>
+              </Predicate>
+            
+              <Predicate Id="AllowedCharacters" Method="MatchesRegex" HelpText="An invalid character was provided.">
+                <Parameters>
+                  <Parameter Id="RegularExpression">(^([0-9A-Za-z\d@#$%^&amp;*\-_+=[\]{}|\\:',?/`~"();! ]|(\.(?!@)))+$)|(^$)</Parameter>
+                </Parameters>
+              </Predicate>
+            
+              <Predicate Id="DisallowedWhitespace" Method="MatchesRegex" HelpText="The password must not begin or end with a whitespace character.">
+                <Parameters>
+                  <Parameter Id="RegularExpression">(^\S.*\S$)|(^\S+$)|(^$)</Parameter>
+                </Parameters>
+              </Predicate>
+        </Predicates>
+
+        <PredicateValidations>
+            <PredicateValidation Id="SimplePassword">
+                <PredicateGroups>
+                    <PredicateGroup Id="DisallowedWhitespaceGroup">
+                        <PredicateReferences>
+                            <PredicateReference Id="DisallowedWhitespace"/>
+                        </PredicateReferences>
+                    </PredicateGroup>
+                    <PredicateGroup Id="AllowedCharactersGroup">
+                        <PredicateReferences>
+                            <PredicateReference Id="AllowedCharacters"/>
+                        </PredicateReferences>
+                    </PredicateGroup>
+                    <PredicateGroup Id="LengthGroup">
+                        <PredicateReferences>
+                            <PredicateReference Id="IsLengthBetween8And64"/>
+                        </PredicateReferences>
+                    </PredicateGroup>
+                </PredicateGroups>
+            </PredicateValidation>
+            <PredicateValidation Id="StrongPassword">
+                <PredicateGroups>
+                    <PredicateGroup Id="DisallowedWhitespaceGroup">
+                        <PredicateReferences>
+                            <PredicateReference Id="DisallowedWhitespace"/>
+                        </PredicateReferences>
+                    </PredicateGroup>
+                    <PredicateGroup Id="AllowedCharactersGroup">
+                        <PredicateReferences>
+                            <PredicateReference Id="AllowedCharacters"/>
+                        </PredicateReferences>
+                    </PredicateGroup>
+                    <PredicateGroup Id="LengthGroup">
+                        <PredicateReferences>
+                            <PredicateReference Id="IsLengthBetween8And64"/>
+                        </PredicateReferences>
+                    </PredicateGroup>
+                    <PredicateGroup Id="CharacterClasses">
+                        <UserHelpText>The password must have at least 3 of the following:</UserHelpText>
+                        <PredicateReferences MatchAtLeast="3">
+                            <PredicateReference Id="Lowercase"/>
+                            <PredicateReference Id="Uppercase"/>
+                            <PredicateReference Id="Number"/>
+                            <PredicateReference Id="Symbol"/>
+                        </PredicateReferences>
+                    </PredicateGroup>
+                </PredicateGroups>
+            </PredicateValidation>
+            <PredicateValidation Id="CustomPassword">
+                <PredicateGroups>
+                    <PredicateGroup Id="DisallowedWhitespaceGroup">
+                        <PredicateReferences>
+                            <PredicateReference Id="DisallowedWhitespace"/>
+                        </PredicateReferences>
+                    </PredicateGroup>
+                    <PredicateGroup Id="AllowedCharactersGroup">
+                        <PredicateReferences>
+                            <PredicateReference Id="AllowedCharacters"/>
+                        </PredicateReferences>
+                    </PredicateGroup>
+                </PredicateGroups>
+            </PredicateValidation>
+        </PredicateValidations>
+        
+        <!-- ClaimsTransformations:クレームの変換方法を定義するセクション-->
+        <!-- 
+            クレームの変換:
+            クレームの変換は、一つまたは複数の入力クレームを取り、それらを処理して新しいクレームを生成するプロセス
+            これにより、データの形式を変更したり、新しいクレームを計算したり、クレームの値を結合したりすることができる
+        -->
+        <ClaimsTransformations>
+
+            <!--
+            ClaimsTransformation: クレームを処理し新しいクレームを生成するプロセスを定義するセクション
+                InputClaims: 変換の入力として使用されるクレームを定義する
+                InputParameters: 変換で使用されるパラメータを指定する
+                    InputParameter: 各入力パラメータの詳細を指定するセクション、データ型や値を定義する
+                OutputClaims: この変換によって生成される新しいクレームを定義するセクション
+                    OutputClaim: 生成される新しいクレームの詳細を指定するセクション、クレームの型や変換後のクレーム型を定義する
+            -->
+
+            <!-- 
+                CheckIfIsValidAccessCode: 
+                    accessCode クレームの値が 88888 であるかどうかを調べ、その結果を isValidAccessCode クレームに格納する
+                    CompareClaimToValue: クレームの値を比較する変換
+            -->
+            <ClaimsTransformation Id="CheckIfIsValidAccessCode" TransformationMethod="CompareClaimToValue">
+                <InputClaims>
+                    <!-- 
+                    InputClaim: 
+                        ClaimTypeReferenceId="accessCode": 入力として使用されるクレームを識別する
+                        TransformationClaimType="inputClaim1": 変換内の入力クレームのエイリアスを定義する
+                    -->
+                    <InputClaim ClaimTypeReferenceId="accessCode" TransformationClaimType="inputClaim1"/>
+                </InputClaims>
+                <InputParameters>
+                    <!-- 
+                    Id="compareTo": 入力クレームと比較する値を識別する
+                    DataType="string": 入力パラメータのデータタイプを指定する
+                    Value="88888": 入力クレームと比較する値
+                    -->
+                    <InputParameter Id="compareTo" DataType="string" Value="88888"/>
+                    <!-- 
+                    Id="operator": 比較演算子を指定する
+                    DataType="string": 入力パラメータのデータタイプを指定する
+                    Value="equal": 変換が等しいことを確認する必要がある
+                    -->
+                    <InputParameter Id="operator" DataType="string" Value="equal"/>
+                    <!-- 
+                    Id="ignoreCase": 比較が大文字と小文字を区別しないことを指定する
+                    DataType="string": 入力パラメータのデータタイプを指定する
+                    Value="true": 比較が大文字と小文字を区別しないことを指定する
+                    -->
+                    <InputParameter Id="ignoreCase" DataType="string" Value="true"/>
+                </InputParameters>
+                <OutputClaims>
+                    <!-- 
+                    ClaimTypeReferenceId="isValidAccessCode": 変換の結果を格納するクレームを識別する
+                    TransformationClaimType="outputClaim": 変換内の出力クレームのエイリアスを定義する
+                    -->
+                    <OutputClaim ClaimTypeReferenceId="isValidAccessCode" TransformationClaimType="outputClaim"/>
+                </OutputClaims>
+            </ClaimsTransformation>
+
+            <ClaimsTransformation Id="ThrowIfIsNotValidAccessCode" TransformationMethod="AssertBooleanClaimIsEqualToValue">
+                <InputClaims>
+                    <InputClaim ClaimTypeReferenceId="isValidAccessCode" TransformationClaimType="inputClaim"/>
+                </InputClaims>
+                <InputParameters>
+                    <InputParameter Id="valueToCompareTo" DataType="boolean" Value="true"/>
+                </InputParameters>
+            </ClaimsTransformation>
+
+            <!--
+                GetDomainFromEmail:
+                この変換は、email クレームからドメイン部分を解析し、そのドメインを domain クレームに格納する。
+            -->
+            <ClaimsTransformation Id="GetDomainFromEmail" TransformationMethod="ParseDomain">
+                <InputClaims>
+                    <InputClaim ClaimTypeReferenceId="email" TransformationClaimType="emailAddress"/>
+                </InputClaims>
+                <OutputClaims>
+                    <OutputClaim ClaimTypeReferenceId="domain" TransformationClaimType="domain"/>
+                </OutputClaims>
+            </ClaimsTransformation>
+
+            <!--
+                LookupDomain:
+                この変換は、domain クレームの値を入力パラメータとして使用し、それに基づいてドメインのステータスを調べる
+                指定されたドメインが contoso.com、fabrikam.com、または woodgrove.com のいずれかである場合、
+                domainStatus クレームの値は 'valid' に設定される
+                それ以外の場合、または errorOnFailedLookup パラメータが true に設定されている場合、エラーが発生する
+            -->
+            <ClaimsTransformation Id="LookupDomain" TransformationMethod="LookupValue">
+                <InputClaims>
+                    <InputClaim ClaimTypeReferenceId="domain" TransformationClaimType="inputParameterId"/>
+                </InputClaims>
+                <InputParameters>
+                    <InputParameter Id="contoso.com" DataType="string" Value="valid"/>
+                    <InputParameter Id="fabrikam.com" DataType="string" Value="valid"/>
+                    <InputParameter Id="woodgrove.com" DataType="string" Value="valid"/>
+                    <InputParameter Id="errorOnFailedLookup" DataType="boolean" Value="true"/>
+                </InputParameters>
+                <OutputClaims>
+                    <OutputClaim ClaimTypeReferenceId="domainStatus" TransformationClaimType="outputClaim"/>
+                </OutputClaims>
+            </ClaimsTransformation>
+
+            <!-- 
+                GenerateRandomObjectIdTransformation:
+                この変換はランダムなオブジェクト ID を生成し、その ID　を objectId クレームに格納する
+            -->
+            <ClaimsTransformation Id="GenerateRandomObjectIdTransformation" TransformationMethod="CreateRandomString">
+                <InputParameters>
+                    <InputParameter Id="randomGeneratorType" DataType="string" Value="GUID"/>
+                </InputParameters>
+                <OutputClaims>
+                    <OutputClaim ClaimTypeReferenceId="objectId" TransformationClaimType="outputClaim"/>
+                </OutputClaims>
+            </ClaimsTransformation>
+
+            <!-- 
+                CreateDisplayNameTransformation: givenName と surname を結合し、displayName を生成
+            -->
+            <ClaimsTransformation Id="CreateDisplayNameTransformation" TransformationMethod="FormatStringMultipleClaims">
+                <InputClaims>
+                    <InputClaim ClaimTypeReferenceId="givenName" TransformationClaimType="inputClaim1"/>
+                    <InputClaim ClaimTypeReferenceId="surname" TransformationClaimType="inputClaim2"/>
+                </InputClaims>
+                <InputParameters>
+                    <InputParameter Id="stringFormat" DataType="string" Value="{0} {1}"/>
+                </InputParameters>
+                <OutputClaims>
+                    <OutputClaim ClaimTypeReferenceId="displayName" TransformationClaimType="outputClaim"/>
+                </OutputClaims>
+            </ClaimsTransformation>
+        
+            <!-- 
+                CreateMessageTransformation: displayName を利用し message を生成
+            -->
+            <ClaimsTransformation Id="CreateMessageTransformation" TransformationMethod="FormatStringClaim">
+                <InputClaims>
+                    <InputClaim ClaimTypeReferenceId="displayName" TransformationClaimType="inputClaim"/>
+                </InputClaims>
+                <InputParameters>
+                    <InputParameter Id="stringFormat" DataType="string" Value="Hello {0}"/>
+                </InputParameters>
+                <OutputClaims>
+                    <OutputClaim ClaimTypeReferenceId="message" TransformationClaimType="outputClaim"/>
+                </OutputClaims>
+            </ClaimsTransformation> 
+        </ClaimsTransformations>
+
+        <ContentDefinitions>
+            <!-- 
+            ContentDefinition: コンテンツの設定を定義するセクション
+                SelfAssertedContentDefinition: このコンテンツ定義の ID
+            -->
+            <!-- 
+                LoadUri: コンテンツのロード時に使用する URI
+                RecoveryUri: エラー発生時にリダイレクトする URI
+                DataUri: コンテンツのデータスキーマを定義する URI
+            -->
+            <ContentDefinition Id="SelfAssertedContentDefinition">
+                <LoadUri>~/tenant/templates/AzureBlue/selfAsserted.cshtml</LoadUri>
+                <RecoveryUri>~/common/default_page_error.html</RecoveryUri>
+                <DataUri>urn:com:microsoft:aad:b2c:elements:contract:selfasserted:2.1.7</DataUri>
+            </ContentDefinition>
+        </ContentDefinitions>
+    </BuildingBlocks>
+
+    <!--
+        ClaimsProviders:
+        クレームを提供するソースやサービスを定義するセクション
+        ID プロバイダやデータソースなどがこれに該当する
+    --> 
+    <!--
+        IDプロバイダ:
+        クレームの主要なソースであり、ユーザーの身元を確認し、特定のクレームを提供するサービス
+        例えば、社会保障番号や氏名などの個人情報を提供する
+ 
+        データソース:
+        クレームを提供する他のソースであり、通常はデータベースや API などの形で存在し、必要な情報を提供する
+        例えば、ユーザーの購入履歴やアカウントの状態などの情報を提供する
+    -->
+    <ClaimsProviders>
+        <!-- ClaimsProvider: クレーム生成のための技術プロファイルを定義するセクション -->
+            <!-- DisplayName: このプロバイダの表示名 -->
+            <!-- TechnicalProfiles: このプロバイダによって使用される技術プロファイルを定義するセクション -->
+                <!-- 
+                    TechnicalProfile: 特定の技術的な操作や設定を定義するセクション
+                        Id: この技術プロファイルの識別子
+                -->
+                    <!-- DisplayName: この技術プロファイルの表示名 -->
+                    <!-- 
+                        Protocol: 使用するプロトコルとそのハンドラを定義する
+                            Name: プロトコルの名前
+                                以下に示すプロトコルが使用可能:
+                                    1. OpenIdConnect: OpenID Connect プロトコル
+                                    2. SAML2: SAML プロトコル
+                                    3. OAuth2: OAuth2 プロトコル
+                                    4. Proprietary: カスタムプロトコル
+                    -->
+                    <!-- OutputClaims: この技術プロファイルによって生成されるクレームを定義する -->
+                    <!-- OutputClaimsTransformations: クレーム変換を参照することで、出力クレームを変換する -->
+                    <!-- ValidationTechnicalProfiles: この技術プロファイルで使用する検証技術プロファイルを定義する -->
+
+        <!-- ここから個別のクレームプロバイダーの定義を開始 -->
+
+        <!-- 
+            "Technical Profile to collect user's accountType" ClaimsProvider:
+                ユーザーのアカウントタイプを収集するためのクレームプロバイダー
+        -->
+        <ClaimsProvider>
+            <DisplayName>Technical Profile to collect user's accountType</DisplayName>
+
+            <TechnicalProfiles>
+                <!-- アカウントタイプを収集するためのテクニカルプロファイル -->
+                <TechnicalProfile Id="AccountTypeInputCollector">
+                    <DisplayName>Collect User Input Technical Profile</DisplayName>
+
+                    <Protocol Name="Proprietary" Handler="Web.TPEngine.Providers.SelfAssertedAttributeProvider, Web.TPEngine, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"/>
+                    <Metadata>
+                        <Item Key="ContentDefinitionReferenceId">SelfAssertedContentDefinition</Item>
+                    </Metadata>
+                    <DisplayClaims>
+                        <!-- ユーザーに表示するアカウントタイプクレームを定義する -->
+                        <DisplayClaim ClaimTypeReferenceId="accountType" Required="true"/>
+                    </DisplayClaims>
+                    <OutputClaims>
+                        <OutputClaim ClaimTypeReferenceId="accountType"/>
+                    </OutputClaims>
+                </TechnicalProfile>
+            </TechnicalProfiles>
+        </ClaimsProvider>
+
+        <!-- 
+            "Technical Profiles to collect user's access code" ClaimsProvider:
+                アクセスコードを収集するためのクレームプロバイダー
+        -->
+        <ClaimsProvider>
+            <DisplayName>Technical Profiles to collect user's access code</DisplayName>
+
+            <!-- アクセスコードを収集し検証するための2つのテクニカルプロファイル -->
+            <TechnicalProfiles>
+                <!-- 
+                    "Collect Access Code Input from user Technical Profil" echnicalProfile:
+                        ユーザーからアクセスコードを収集するテクニカルプロファイル
+                -->
+                <TechnicalProfile Id="AccessCodeInputCollector">
+                    <DisplayName>Collect Access Code Input from user Technical Profile</DisplayName>
+                    <Protocol Name="Proprietary" Handler="Web.TPEngine.Providers.SelfAssertedAttributeProvider, Web.TPEngine, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"/>
+                    <Metadata>
+                        <!-- 
+                            ContentDefinitionReferenceId: 使用するコンテンツ定義を指定する 
+                                SelfAssertedContentDefinition: このテクニカルプロファイルで使用するコンテンツ定義の ID
+                        -->
+                        <Item Key="ContentDefinitionReferenceId">SelfAssertedContentDefinition</Item>
+                        <!-- 
+                            UserMessageIfClaimsTransformationBooleanValueIsNotEqual: 
+                                アクセスコードが無効な場合に表示するメッセージを定義する
+                        -->
+                        <Item Key="UserMessageIfClaimsTransformationBooleanValueIsNotEqual">The access code is invalid.</Item>
+                        <!-- ClaimTypeOnWhichToEnable: このテクニカルプロファイルを有効にするためのクレームタイプを指定する -->
+                        <Item Key="ClaimTypeOnWhichToEnable">accountType</Item>
+                        <!-- ClaimValueOnWhichToEnable: このテクニカルプロファイルを有効にするためのクレーム値を指定する -->
+                        <Item Key="ClaimValueOnWhichToEnable">personal</Item>
+                    </Metadata>
+                    <DisplayClaims>
+                        <!-- ユーザーに表示するアクセスコードクレームを定義する -->
+                        <DisplayClaim ClaimTypeReferenceId="accessCode" Required="true"/>
+                    </DisplayClaims>
+                    <OutputClaims>
+                        <!-- 出力するアクセスコードクレームを定義する -->
+                        <OutputClaim ClaimTypeReferenceId="accessCode"/>
+                    </OutputClaims>
+                    <!-- 
+                        ValidationTechnicalProfiles: 
+                            このテクニカルプロファイルで使用する検証テクニカルプロファイルを定義する
+                    -->
+                    <ValidationTechnicalProfiles>
+                        <!-- 
+                            ValidationTechnicalProfile: アクセスコードの検証テクニカルプロファイルを定義する 
+                                CheckAccessCodeViaClaimsTransformationChecker: アクセスコードの検証を行うテクニカルプロファイルの ID
+                        -->
+                        <ValidationTechnicalProfile ReferenceId="CheckAccessCodeViaClaimsTransformationChecker"/>
+                    </ValidationTechnicalProfiles>
+                    <!-- 
+                        EnabledForUserJourneys: このテクニカルプロファイルが有効になる条件を定義する
+                            OnClaimsExistence: 指定されたクレームが存在する場合に有効になる
+                    -->
+                    <EnabledForUserJourneys>OnClaimsExistence</EnabledForUserJourneys>
+                </TechnicalProfile>
+
+                <!-- アクセスコードの有効性をチェックするテクニカルプロファイル -->
+                <TechnicalProfile Id="CheckAccessCodeViaClaimsTransformationChecker">
+                    <DisplayName>A Claims Transformations to check user's access code validity</DisplayName>
+
+                    <Protocol Name="Proprietary" Handler="Web.TPEngine.Providers.ClaimsTransformationProtocolProvider, Web.TPEngine, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"/>
+                    <OutputClaims>
+                        <OutputClaim ClaimTypeReferenceId="isValidAccessCode"/>
+                    </OutputClaims>
+                    <OutputClaimsTransformations>
+                        <!-- CheckIfIsValidAccessCode: アクセスコードが有効かどうかをチェックする ClaimsTransformation の ID -->
+                        <OutputClaimsTransformation ReferenceId="CheckIfIsValidAccessCode"/>
+                        <!-- ThrowIfIsNotValidAccessCode: アクセスコードが無効な場合にエラーをスローする ClaimsTransformation の ID -->
+                        <OutputClaimsTransformation ReferenceId="ThrowIfIsNotValidAccessCode"/>
+                    </OutputClaimsTransformations>
+                </TechnicalProfile>
+            </TechnicalProfiles>
+        </ClaimsProvider>
+
+        <ClaimsProvider>
+            <DisplayName>Technical Profiles to collect user's details </DisplayName>
+            <!-- 
+            この "Technical Profiles to collect user's details" ClaimsProvider は、
+            Technical Profile "UserInformationCollector" を通じてユーザーの詳細を収集する役割を持っている
+            TechnicalProfile は、"accountType", "givenName", "surname" の入力を要求し、これらのクレームを出力として提供する
+            -->
+            
+            <TechnicalProfiles>
+                <TechnicalProfile Id="UserInformationCollector">
+                    <DisplayName>Collect User Input Technical Profile</DisplayName>
+                    <!-- 
+                    Protocol: 
+                        Name: 使用するプロトコルの名前を指定。ここでは "Proprietary" が指定されている
+                        Handler: プロトコルを処理するためのハンドラの完全修飾名を指定。以下の要素が含まれる:
+                            1. Web.TPEngine.Providers.SelfAssertedAttributeProvider: 
+                                ユーザーから直接属性を収集するためのハンドラ
+                                このハンドラは、ユーザージャーニー中にユーザーの名前、姓、メールアドレスなどの Self-Asserted 属性を管理する
+                            2. Web.TPEngine: ハンドラが定義されているアセンブリ名
+                            3. Version=1.0.0.0: アセンブリのバージョン番号
+                            4. Culture=neutral: アセンブリがカルチャ中立であることを示す。特定の言語や地域に依存するリソースは含まれておらず、異なる言語や地域設定で実行されるアプリケーションで再利用可能
+                            5. PublicKeyToken=null: アセンブリが署名されていないことを示す
+                    -->
+                    <Protocol 
+                      Name="Proprietary" 
+                      Handler="Web.TPEngine.Providers.SelfAssertedAttributeProvider, Web.TPEngine, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"/>
+                    <Metadata>
+                        <Item Key="ContentDefinitionReferenceId">SelfAssertedContentDefinition</Item>
+                        <Item Key="LookupNotFound">The provided email address isn't a valid Contoso Employee email.</Item>
+                    </Metadata>
+                    <DisplayClaims>
+                        <!-- Required="true": 必須入力 -->
+                        <DisplayClaim ClaimTypeReferenceId="givenName" Required="true"/>
+                        <DisplayClaim ClaimTypeReferenceId="surname" Required="true"/>
+                        <DisplayClaim ClaimTypeReferenceId="email" Required="true"/>
+                        <DisplayClaim ClaimTypeReferenceId="password" Required="true"/>
+                        <DisplayClaim ClaimTypeReferenceId="reenterPassword" Required="true"/>
+                    </DisplayClaims>
+                    <OutputClaims>
+                        <OutputClaim ClaimTypeReferenceId="givenName"/>
+                        <OutputClaim ClaimTypeReferenceId="surname"/>
+                        <OutputClaim ClaimTypeReferenceId="email"/>
+                        <OutputClaim ClaimTypeReferenceId="password"/>
+                        <OutputClaim ClaimTypeReferenceId="reenterPassword"/>
+                    </OutputClaims>
+
+                    <ValidationTechnicalProfiles>
+                        
+                        <!-- ValidationTechnicalProfile: 特定のテクニカルプロファイルの検証を定義する -->
+                        <ValidationTechnicalProfile ReferenceId="CheckCompanyDomain" >
+                            <!-- 
+                                accountType クレームの値が "work" である場合、CheckCompanyDomain テクニカルプロファイルの検証を実行する
+                                それ以外の場合は、検証をスキップする
+                            -->
+
+                            <!-- Preconditions: このテクニカルプロファイルが実行される前に満たさなければならない条件を定義する -->
+                            <Preconditions>
+                                <!-- 
+                                    Precondition: 特定の条件が満たされているかどうかをチェックするための事前条件を定義する
+                                        Type="ClaimEquals": 指定されたクレームの値が等しいかどうかをチェックする
+                                        ExecuteActionsIf="false": 条件が満たされていない場合に実行するアクションを定義する
+                                -->
+                                <Precondition Type="ClaimEquals" ExecuteActionsIf="false">
+                                    <!-- Value: 事前条件のチェックに使用されるクレームの値を定義する -->
+                                    <Value>accountType</Value>
+                                    <Value>work</Value>
+                                    <!-- 
+                                        Action: 事前条件が満たされない場合に実行するアクションを定義する 
+                                            SkipThisValidationTechnicalProfile: このテクニカルプロファイルをスキップする
+                                    -->
+                                    <Action>SkipThisValidationTechnicalProfile</Action>
+                                </Precondition>
+                            </Preconditions>
+                        </ValidationTechnicalProfile>
+                    </ValidationTechnicalProfiles>
+                </TechnicalProfile>
+
+                <TechnicalProfile Id="CheckCompanyDomain">
+                    <DisplayName>Check Company validity </DisplayName>
+                    <Protocol Name="Proprietary" Handler="Web.TPEngine.Providers.ClaimsTransformationProtocolProvider, Web.TPEngine, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"/>
+                    <InputClaimsTransformations>
+                        <InputClaimsTransformation ReferenceId="GetDomainFromEmail"/>
+                    </InputClaimsTransformations>
+                    <OutputClaims>
+                        <OutputClaim ClaimTypeReferenceId="domain"/>
+                    </OutputClaims>
+                    <OutputClaimsTransformations>
+                        <OutputClaimsTransformation ReferenceId="LookupDomain"/>
+                    </OutputClaimsTransformations>
+                </TechnicalProfile>
+            </TechnicalProfiles>
+        </ClaimsProvider>
+
+        <ClaimsProvider>
+            <DisplayName>Technical Profiles to generate claims</DisplayName>
+            <!-- 
+            この "Technical Profiles to generate claims" ClaimsProvider は、指定された TechnicalProfile を通じてクレームを生成する役割を持っている
+            TechnicalProfile "ClaimGenerator" は、objectId, displayName, message というクレームを生成し、それぞれのクレーム変換を通じて処理される
+            -->
+
+            <TechnicalProfiles>
+                <TechnicalProfile Id="ClaimGenerator">
+                    <DisplayName>Generate Object ID, displayName and message Claims Technical Profile.</DisplayName>
+                    <!-- 
+                    Protocol:
+                        - Name: 使用するプロトコルの名前を指定する。ここでは "Proprietary" と指定されている
+                        - Handler: このプロトコルを処理するためのハンドラを指定する。指定されているのは、.NET の型の完全修飾名で、以下の要素を含んでいる:
+                            1. Web.TPEngine.Providers.ClaimsTransformationProtocolProvider: クラス名および名前空間
+                            2. Web.TPEngine: クラスが定義されているアセンブリ名
+                            3. Version=1.0.0.0: アセンブリのバージョン番号
+                            4. Culture=neutral:
+                                アセンブリがカルチャ中立であることを示す
+                                つまり、特定の言語や地域に依存するリソースは含まれておらず、異なる言語や地域設定で実行されるアプリケーションで再利用可能
+                            5. PublicKeyToken=null: アセンブリが署名されていないことを示す
+                    -->
+                    <Protocol 
+                      Name="Proprietary" 
+                      Handler="Web.TPEngine.Providers.ClaimsTransformationProtocolProvider, Web.TPEngine, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"/>
+                    <OutputClaims>
+                        <OutputClaim ClaimTypeReferenceId="objectId"/>
+                        <OutputClaim ClaimTypeReferenceId="displayName"/>
+                        <OutputClaim ClaimTypeReferenceId="message"/>
+                    </OutputClaims>
+                    <OutputClaimsTransformations>
+                        <OutputClaimsTransformation ReferenceId="GenerateRandomObjectIdTransformation"/>
+                        <OutputClaimsTransformation ReferenceId="CreateDisplayNameTransformation"/>
+                        <OutputClaimsTransformation ReferenceId="CreateMessageTransformation"/>
+                    </OutputClaimsTransformations>
+                </TechnicalProfile>
+            </TechnicalProfiles>
+        </ClaimsProvider>
+
+        <ClaimsProvider>
+            <DisplayName>Token Issuer</DisplayName>
+            <!-- TechnicalProfiles: クレームプロバイダーがサポートする技術的な動作や設定をまとめたセクション -->
+            <TechnicalProfiles>
+                <TechnicalProfile Id="JwtIssuer">
+                    <DisplayName>JWT Issuer</DisplayName>
+                    <Protocol Name="None" />
+                    <!-- OutputTokenFormat: このプロバイダが発行するトークンの形式 -->
+                    <OutputTokenFormat>JWT</OutputTokenFormat>
+                    <!-- Metadata: 技術プロファイルの動作に関する追加設定や情報 -->
+                    <Metadata>
+                        <Item Key="client_id">{service:te}</Item>
+                        <Item Key="issuer_refresh_token_user_identity_claim_type">objectId</Item>
+                        <Item Key="SendTokenResponseBodyWithJsonNumbers">true</Item>
+                    </Metadata>
+                    <!-- CryptographicKeys: トークンの署名や暗号化に使用する鍵の情報 -->
+                    <CryptographicKeys>
+                        <Key Id="issuer_secret" StorageReferenceId="B2C_1A_TokenSigningKeyContainer" />
+                        <Key Id="issuer_refresh_token_key" StorageReferenceId="B2C_1A_TokenEncryptionKeyContainer" />
+                    </CryptographicKeys>
+                </TechnicalProfile>
+            </TechnicalProfiles>
+        </ClaimsProvider>
+
+        <!-- フレームワークに必要な技術プロファイルを定義するクレームプロバイダー -->
+        <ClaimsProvider>
+            <DisplayName>Trustframework Policy Engine TechnicalProfiles</DisplayName>
+                <TechnicalProfiles>
+                    <TechnicalProfile Id="TpEngine_c3bd4fe2-1775-4013-b91d-35f16d377d13">
+                    <DisplayName>Trustframework Policy Engine Default Technical Profile</DisplayName>
+                    <Protocol Name="None" />
+                    <!-- Metadata: 技術プロファイルの動作に関する追加設定や情報 -->
+                    <Metadata>
+                        <!-- "url" というキーで、特定のサービスの URL を指定する場面で使われることが多い。
+                            "{service:te}" はプレースホルダー（置き換え文字）で、実際の運用時には特定のサービスの URL やエンドポイントに置き換えられることを示している -->
+                        <Item Key="url">{service:te}</Item>
+                    </Metadata>
+                </TechnicalProfile>
+            </TechnicalProfiles>
+        </ClaimsProvider>
+
+    </ClaimsProviders>
+
+    <UserJourneys>
+        <!-- UserJourney: ユーザーがカスタムポリシーを実行する際の手順や流れを定義するセクション -->
+        <UserJourney Id="HelloWorldJourney">
+            <!-- OrchestrationSteps: ユーザージャーニーの中での具体的な手順を一つ一つ定義するセクション -->
+            <OrchestrationSteps>
+                <!-- 
+                OrchestrationStep: 各ステップは特定の操作または動作を表し、このステップではクレームの送信が行われる
+                    Order: ステップの実行順序を示す属性
+
+                    Type: 
+                        このステップで行われる操作のタイプを示す属性
+                        以下の値が指定できる:
+                            - "ClaimsExchange": クレームの交換が行われる
+                            - "SendClaims": クレームの送信が行われる
+                -->
+                    <!-- 
+                    ClaimsExchanges:
+                        この要素は、OrchestrationStep 内で行われるクレームの交換を定義するセクション
+                        これにより、ユーザーと技術プロファイルの間でクレームがどのように交換されるかを指定できる
+
+                        ClaimsExchange: 
+                            この要素は、特定のクレーム交換を定義する
+                            クレーム交換は、ユーザーと技術プロファイルの間で行われる特定のクレームの交換を表す
+                            Id: このクレーム交換の識別子を指定する属性
+                            TechnicalProfileReferenceId: この交換で参照する技術プロファイルのIDを指定する属性
+                    -->
+
+                <!-- 
+                    アカウントタイプを収集する操作が行われる
+                        Order="1": 1 番目のステップとして実行される
+                -->
+                <OrchestrationStep Order="1" Type="ClaimsExchange">
+                    <ClaimsExchanges>
+                        <!-- AccountTypeInputCollector: アカウントタイプを収集するための技術プロファイル -->
+                        <ClaimsExchange 
+                          Id="AccountTypeInputCollectorClaimsExchange" 
+                          TechnicalProfileReferenceId="AccountTypeInputCollector"/>
+                    </ClaimsExchanges>
+                </OrchestrationStep>
+
+                <!-- 
+                    アクセスコードを収集する操作が行われる
+                        Order="2": 2 番目のステップとして実行される
+                -->
+                <OrchestrationStep Order="2" Type="ClaimsExchange">
+                    <ClaimsExchanges>
+                        <!-- AccessCodeInputCollector: アクセスコードを収集するための技術プロファイル -->
+                        <ClaimsExchange Id="GetAccessCodeClaimsExchange" TechnicalProfileReferenceId="AccessCodeInputCollector" />
+                    </ClaimsExchanges>
+                </OrchestrationStep>
+
+                <!-- 
+                    ユーザーの情報を収集する操作が行われる
+                        Order="3": 3 番目のステップとして実行される
+                -->
+                <OrchestrationStep Order="3" Type="ClaimsExchange">
+                    <ClaimsExchanges>
+                        <!--
+                            ユーザーの情報を収集するためのクレーム交換
+                                GetUserInformationClaimsExchange: このクレーム交換の ID
+                                UserInformationCollector: ユーザーの情報を収集するための技術プロファイル
+                        -->
+                        <ClaimsExchange Id="GetUserInformationClaimsExchange" TechnicalProfileReferenceId="UserInformationCollector"/>
+                    </ClaimsExchanges>
+                </OrchestrationStep>
+
+                <!--
+                    クレームを生成する操作が行われる
+                        Order="4": 4 番目のステップとして実行される
+                -->
+                <OrchestrationStep Order="4" Type="ClaimsExchange">
+                    <ClaimsExchanges>
+                        <!--
+                            GetMessageClaimsExchange: クレームを生成するためのクレーム交換
+                            ClaimGenerator: クレームを生成するための技術プロファイル
+                        -->
+                        <ClaimsExchange Id="GetMessageClaimsExchange" TechnicalProfileReferenceId="ClaimGenerator"/>
+                    </ClaimsExchanges>
+                </OrchestrationStep>
+
+                <!--
+                    クレームを送信する操作が行われる
+                        Order="5": 5 番目のステップとして実行される
+                        SendClaims: クレームを送信するための操作
+                        JwtIssuer: トークンの発行を行う技術プロファイル
+                -->
+                <OrchestrationStep Order="5" Type="SendClaims" CpimIssuerTechnicalProfileReferenceId="JwtIssuer"/>
+            </OrchestrationSteps>
+        </UserJourney>
+    </UserJourneys>
+
+
+
+    <RelyingParty>
+        <!-- 
+        RelyingParty: 
+            カスタムポリシーを利用するアプリケーションやサービスの設定を定義する
+            Relying Partyは、カスタムポリシーに依存して認証やクレームの処理を行う外部のエンティティを指す
+        -->
+
+        <!-- 
+        DefaultUserJourney: 標準として使用するユーザージャーニーを指定 
+            HelloWorldJourney: 標準として使用するユーザージャーニーの ID
+        -->
+        <DefaultUserJourney ReferenceId="HelloWorldJourney"/>
+        <!--
+        TechnicalProfile: 特定の技術的な動作や設定を詳細に記述するセクション
+            HelloWorldPolicyProfile: この技術プロファイルの ID
+        -->
+        <TechnicalProfile Id="HelloWorldPolicyProfile">
+            <!-- DisplayName: この技術プロファイルの名前を示す。主に管理や識別のために使用 -->
+            <DisplayName>Hello World Policy Profile</DisplayName>
+        
+            <!-- 
+            Protocol: 使用するプロトコルを指定
+                OpenIdConnect: OpenIdConnectというプロトコルを使用
+            -->
+            <Protocol Name="OpenIdConnect" />
+
+            <!-- OutputClaims: このプロファイルを実行した際に返されるクレームの設定 -->
+            <OutputClaims>
+                <!-- 
+                OutputClaim: このエレメントは、返される個々のクレームの詳細設定を定義する
+                    ClaimTypeReferenceId: この属性は、クレームタイプの参照 ID を指定する
+                    PartnerClaimType: この属性は、パートナーのクレームタイプを指定する
+                    DefaultValue: この属性は、クレームのデフォルト値を指定する
+                -->
+
+                <!-- ここでは "objectId" というクレームを "sub" という名前で返し、デフォルト値として特定の文字列を指定 -->
+                <!--
+                    PartnerClaimType="sub":
+                    "objectId" クレームが "sub" という名前で返される 
+                    "sub"は、OpenID Connect プロトコルにおける標準的なクレーム名で、主題 (subject) を識別するために使われる
+                -->
+                <OutputClaim ClaimTypeReferenceId="objectId" PartnerClaimType="sub"/>
+                <OutputClaim ClaimTypeReferenceId="accountType" />
+                <OutputClaim ClaimTypeReferenceId="email" />
+                <OutputClaim ClaimTypeReferenceId="displayName"/>
+                <OutputClaim ClaimTypeReferenceId="message"/>
+            </OutputClaims>
+
+            <!-- SubjectNamingInfo: トークンの subject (主題) として使用するクレームを指定 -->
+            <!-- ここでは "sub" というクレームをsubjectとして使用することを示しています --> 
+            <SubjectNamingInfo ClaimType="sub" />
+        </TechnicalProfile>
+    </RelyingParty>
+
+</TrustFrameworkPolicy>

@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!-- カスタムポリシー ContosoCustomPolicy の定義 -->
+
+<!-- 
+TrustFrameworkPolicy:
+    Azure AD B2C では、この XML ベースのカスタムポリシーを使用してユーザージャーニーを定義し、認証と認可の動作を高度にカスタマイズできる
+    
+    TenantId: Azure AD B2C のテナントを一意に識別するためのもの
+    PolicyId: このカスタムポリシーの ID
+    publicPolicyUri: 
+        カスタムポリシーの公的な識別子を示す URI
+        外部アプリケーションやサービスがこのカスタムポリシーを参照する際や OpenID Connect、OAuth2 の認証リクエスト時に使われる
+        フォーマットは通常 "http://{your-tenant-name}.onmicrosoft.com/{policy-name}"
+-->
+
+<!-- TenantId と PublicPolicyUri の yourtenant を置き換える必要がある -->
+
+<TrustFrameworkPolicy
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+  xmlns="http://schemas.microsoft.com/online/cpim/schemas/2013/06"
+  PolicySchemaVersion="0.3.0.0"
+  TenantId="yourtenant.onmicrosoft.com" 
+  PolicyId="B2C_1A_ContosoCustomPolicy" 
+  PublicPolicyUri="http://yourtenant.onmicrosoft.com/B2C_1A_ContosoCustomPolicy">
+
+
+    <!-- 
+    TrustFrameworkPolicy には以下の主要なコンポーネントが含まれる:
+        1. BuildingBlocks: 再利用可能なコンポーネントや設定の定義
+        2. ClaimsProviders: クレームデータを提供するソースやサービスの定義
+        3. UserJourneys: ユーザーが実行する手順やフローを定義
+        4. RelyingParty: このカスタムポリシーを使用するアプリケーションやサービスの設定
+    -->
+
+    <BuildingBlocks>
+        <!-- BuildingBlocks セクションは、異なるユーザージャーニーやポリシー間で再利用可能なコンポーネントや設定を定義する -->
+
+        <ClaimsSchema>
+            <!-- ClaimsSchema は、カスタムポリシーで使用されるクレームの型を定義する -->
+
+            <!-- objectId という名前のクレーム型を定義 -->
+            <ClaimType Id="objectId">
+                <!-- DisplayName: クレームの表示名。ユーザーには表示されないが、開発者が理解するためのもの -->
+                <DisplayName>unique object Id for subject of the claims being returned</DisplayName>
+                <!-- DataType: クレームのデータ型。ここでは文字列を示してる -->
+                <DataType>string</DataType>
+            </ClaimType>        
+            <ClaimType Id="message">
+                <!-- DisplayName: クレームの表示名。ユーザーには表示されないが、開発者が理解するためのもの -->
+                <!-- このクレームが「Hello World」のメッセージを保持することを示す表示名を設定 -->
+                <DisplayName>Will hold Hello World message</DisplayName>
+                <!-- DataType: クレームのデータ型。ここでは文字列を示してる -->
+                <DataType>string</DataType>
+            </ClaimType>
+        </ClaimsSchema>        
+    </BuildingBlocks>
+
+    <!-- ClaimsProviders: クレームを提供するソースやサービスを定義するセクション。
+        IDプロバイダやデータソースなどがこれに該当する --> 
+    <ClaimsProviders>
+
+        <!-- ここから個別のクレームプロバイダーの定義を開始 -->
+        <ClaimsProvider>
+            <DisplayName>Token Issuer</DisplayName>
+            <!-- TechnicalProfiles: クレームプロバイダーがサポートする技術的な動作や設定をまとめたセクション -->
+            <TechnicalProfiles>
+                <TechnicalProfile Id="JwtIssuer">
+                    <DisplayName>JWT Issuer</DisplayName>
+                    <Protocol Name="None" />
+                    <!-- OutputTokenFormat: このプロバイダが発行するトークンの形式 -->
+                    <OutputTokenFormat>JWT</OutputTokenFormat>
+                    <!-- Metadata: 技術プロファイルの動作に関する追加設定や情報 -->
+                    <Metadata>
+                        <Item Key="client_id">{service:te}</Item>
+                        <Item Key="issuer_refresh_token_user_identity_claim_type">objectId</Item>
+                        <Item Key="SendTokenResponseBodyWithJsonNumbers">true</Item>
+                    </Metadata>
+                    <!-- CryptographicKeys: トークンの署名や暗号化に使用する鍵の情報 -->
+                    <CryptographicKeys>
+                        <Key Id="issuer_secret" StorageReferenceId="B2C_1A_TokenSigningKeyContainer" />
+                        <Key Id="issuer_refresh_token_key" StorageReferenceId="B2C_1A_TokenEncryptionKeyContainer" />
+                    </CryptographicKeys>
+                </TechnicalProfile>
+            </TechnicalProfiles>
+        </ClaimsProvider>
+
+        <!-- フレームワークに必要な技術プロファイルを定義するクレームプロバイダー -->
+        <ClaimsProvider>
+            <DisplayName>Trustframework Policy Engine TechnicalProfiles</DisplayName>
+                <TechnicalProfiles>
+                    <TechnicalProfile Id="TpEngine_c3bd4fe2-1775-4013-b91d-35f16d377d13">
+                    <DisplayName>Trustframework Policy Engine Default Technical Profile</DisplayName>
+                    <Protocol Name="None" />
+                    <!-- Metadata: 技術プロファイルの動作に関する追加設定や情報 -->
+                    <Metadata>
+                        <!-- "url" というキーで、特定のサービスの URL を指定する場面で使われることが多い。
+                            "{service:te}" はプレースホルダー（置き換え文字）で、実際の運用時には特定のサービスの URL やエンドポイントに置き換えられることを示している -->
+                        <Item Key="url">{service:te}</Item>
+                    </Metadata>
+                </TechnicalProfile>
+            </TechnicalProfiles>
+        </ClaimsProvider>
+    </ClaimsProviders>
+
+    <!-- UserJourneys: ユーザーが実行するプロセスを定義するセクション -->
+    <UserJourneys>
+        <!-- UserJourney: ユーザーがカスタムポリシーを実行する際の手順や流れを定義するセクション -->
+        <UserJourney Id="HelloWorldJourney">
+            <!-- OrchestrationSteps: ユーザージャーニーの中での具体的な手順を一つ一つ定義するセクション -->
+            <!-- ここでは1つ目の手順として、クレームを送信する動作を指定。その際に使用する技術プロファイルは "JwtIssuer" という ID を持つものを参照 -->
+            <OrchestrationSteps>
+                <!-- 
+                OrchestrationStep: 各ステップは特定の操作または動作を表し、このステップではクレームの送信が行われる
+                Order: ステップの実行順序を示す属性で、この場合は1番目のステップであることを示している
+                Type: この属性は、このステップで行われる操作のタイプを示す
+                "SendClaims": クレームを送信する操作を示す
+                CpimIssuerTechnicalProfileReferenceId: クレームを送信する際に使用する技術プロファイルを参照するための ID を指定
+                -->
+                <OrchestrationStep Order="1" Type="SendClaims" CpimIssuerTechnicalProfileReferenceId="JwtIssuer" />
+            </OrchestrationSteps>
+        </UserJourney>
+    </UserJourneys>
+
+    <RelyingParty>
+        <!-- 
+        RelyingParty: 
+            カスタムポリシーを利用するアプリケーションやサービスの設定を定義する
+            Relying Partyは、カスタムポリシーに依存して認証やクレームの処理を行う外部のエンティティを指す
+        -->
+
+        <!-- 
+        DefaultUserJourney: ポリシーで標準として使用するユーザージャーニーを指定
+            HelloWorldJourney: 標準として使用するユーザージャーニーの ID
+        -->
+        <DefaultUserJourney ReferenceId="HelloWorldJourney"/>
+        <!-- 
+        TechnicalProfile: 特定の技術的な動作や設定を詳細に記述するセクション 
+            HelloWorldPolicyProfile: このテクニカルプロファイルの ID
+        -->
+        <TechnicalProfile Id="HelloWorldPolicyProfile">
+            <!-- DisplayName: この技術プロファイルの名前を示す。主に管理や識別のために使用 -->
+            <DisplayName>Hello World Policy Profile</DisplayName>
+        
+            <!--
+            Protocol: 使用するプロトコルを指定
+                OpenIdConnect: OpenID Connect プロトコルを使用することを示す
+            -->
+            <Protocol Name="OpenIdConnect" />
+
+            <!-- OutputClaims: このプロファイルを実行した際に返されるクレームの設定 -->
+            <OutputClaims>
+                <!-- 
+                OutputClaim: このエレメントは、返される個々のクレームの詳細設定を定義する
+                    ClaimTypeReferenceId: この属性は、クレームタイプの参照 ID を指定する
+                    PartnerClaimType: この属性は、パートナーのクレームタイプを指定する
+                    DefaultValue: この属性は、クレームのデフォルト値を指定する
+                -->
+                <!-- ここでは "objectId" というクレームを "sub" という名前で返し、デフォルト値として特定の文字列を指定 -->
+                <!--
+                    PartnerClaimType="sub": "objectId" クレームが "sub" という名前で返される 
+                    "sub"は、OpenID Connect プロトコルにおける標準的なクレーム名で、主題 (subject) を識別するために使われる
+                -->
+                <OutputClaim ClaimTypeReferenceId="objectId" PartnerClaimType="sub" DefaultValue="abcd-1234-efgh-5678-ijkl-etc."/>
+                <!-- ここでは "message" というクレームを返し、デフォルト値として "Hello World!" を指定 -->
+                <OutputClaim ClaimTypeReferenceId="message" DefaultValue="Hello World!"/>
+            </OutputClaims>
+
+            <!-- SubjectNamingInfo: トークンの subject (主題) として使用するクレームを指定 -->
+            <!-- ここでは "sub" というクレームをsubjectとして使用することを示しています --> 
+            <SubjectNamingInfo ClaimType="sub" />
+        </TechnicalProfile>
+    </RelyingParty>
+
+</TrustFrameworkPolicy>
